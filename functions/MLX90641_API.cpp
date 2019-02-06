@@ -488,11 +488,11 @@ void MLX90641_CalculateTo(uint16_t *frameData, const paramsMLX90641 *params, flo
         }
         irData = irData * gain;
         
-        irData = irData - params->offset[subPage][pixelNumber]*(1 + params->kta[pixelNumber]*(ta - 25))*(1 + params->kv[pixelNumber]*(vdd - 3.3));
-        
-        irData = irData / emissivity;
+        irData = irData - params->offset[subPage][pixelNumber]*(1 + params->kta[pixelNumber]*(ta - 25))*(1 + params->kv[pixelNumber]*(vdd - 3.3));                
     
         irData = irData - params->tgc * irDataCP;
+        
+        irData = irData / emissivity;
         
         alphaCompensated = (params->alpha[pixelNumber] - params->tgc * params->cpAlpha)*(1 + params->KsTa * (ta - 25));
         
@@ -590,7 +590,7 @@ void MLX90641_GetImage(uint16_t *frameData, const paramsMLX90641 *params, float 
         
         irData = irData - params->tgc * irDataCP;
             
-        alphaCompensated = (params->alpha[pixelNumber] - params->tgc * params->cpAlpha)*(1 + params->KsTa * (ta - 25));
+        alphaCompensated = (params->alpha[pixelNumber] - params->tgc * params->cpAlpha);
             
         image = irData/alphaCompensated;
             
