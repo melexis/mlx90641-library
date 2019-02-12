@@ -70,13 +70,11 @@ int HammingDecode(uint16_t *eeData)
         parity[4] = -1;
         
         data = eeData[addr];
-        //mask = 1;
+        mask = 1;
         for( int i = 0; i < 16; i++)
-        {
-          D[i] = (data & ((int)(pow(2,(double)i)))) >> i;
-          
-          //D[i] = (data & mask) >> i;
-          //mask = mask << 1;
+        {          
+          D[i] = (data & mask) >> i;
+          mask = mask << 1;
         }
         
         parity[0] = D[0]^D[1]^D[3]^D[4]^D[6]^D[8]^D[10]^D[11];
@@ -86,9 +84,8 @@ int HammingDecode(uint16_t *eeData)
         parity[4] = D[0]^D[1]^D[2]^D[3]^D[4]^D[5]^D[6]^D[7]^D[8]^D[9]^D[10]^D[11]^D[12]^D[13]^D[14]^D[15];
        
         if ((parity[0]!=0) || (parity[1]!=0) || (parity[2]!=0) || (parity[3]!=0) || (parity[4]!=0))
-        {
-            check = parity[0]*(pow(2,(double)0)) + parity[1]*(pow(2,(double)1)) + parity[2]*(pow(2,(double)2)) + parity[3]*(pow(2,(double)3)) + parity[4]*(pow(2,(double)4));
-            //check = (parity[0]<<0) + (parity[1]<<1) + (parity[2]<<2) + (parity[3]<<3) + (parity[4]<<4);
+        {        
+            check = (parity[0]<<0) + (parity[1]<<1) + (parity[2]<<2) + (parity[3]<<3) + (parity[4]<<4);
     
             if ((check > 15)&&(check < 32))
             {
@@ -169,10 +166,9 @@ int HammingDecode(uint16_t *eeData)
                 data = 0;
                 mask = 1;
                 for( int i = 0; i < 16; i++)
-                {
-                    data = data + (D[i]*(int)pow(2,(double)i));
-                    //data = data + D[i]*mask;
-                    //mask = mask << 1;
+                {                    
+                    data = data + D[i]*mask;
+                    mask = mask << 1;
                 }
        
             }
@@ -496,7 +492,7 @@ void MLX90641_CalculateTo(uint16_t *frameData, const paramsMLX90641 *params, flo
         
         alphaCompensated = (params->alpha[pixelNumber] - params->tgc * params->cpAlpha)*(1 + params->KsTa * (ta - 25));
         
-        Sx = pow((double)alphaCompensated, (double)3) * (irData + alphaCompensated * taTr);
+        Sx = alphaCompensated * alphaCompensated * alphaCompensated * (irData + alphaCompensated * taTr);
         Sx = sqrt(sqrt(Sx)) * params->ksTo[1];
         
         To = sqrt(sqrt(irData/(alphaCompensated * (1 - params->ksTo[1] * 273.15) + Sx) + taTr)) - 273.15;
