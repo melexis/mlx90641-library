@@ -16,6 +16,8 @@
  */
 #ifndef _MLX641_API_H_
 #define _MLX641_API_H_
+
+#define SCALEALPHA 0.000001
     
   typedef struct
     {
@@ -34,10 +36,13 @@
         float KsTa;
         float ksTo[8];
         int16_t ct[8];
-        float alpha[192];    
+        uint16_t alpha[192]; 
+        uint8_t alphaScale;   
         int16_t offset[2][192];    
-        float kta[192];    
-        float kv[192];
+        int8_t kta[192];
+        uint8_t ktaScale;    
+        int8_t kv[192];
+        uint8_t kvScale;
         float cpAlpha;
         int16_t cpOffset;
         float emissivityEE; 
