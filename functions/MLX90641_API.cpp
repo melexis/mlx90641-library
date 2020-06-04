@@ -34,7 +34,8 @@ void ExtractCPParameters(uint16_t *eeData, paramsMLX90641 *mlx90641);
 int ExtractDeviatingPixels(uint16_t *eeData, paramsMLX90641 *mlx90641);
 int CheckEEPROMValid(uint16_t *eeData); 
 int HammingDecode(uint16_t *eeData);  
- 
+int ValidateFrameData(uint16_t *frameData);
+int ValidateAuxData(uint16_t *auxData);
 
 //------------------------------------------------------------------------------
   
@@ -62,7 +63,7 @@ int HammingDecode(uint16_t *eeData)
     uint16_t mask;
     
     for (int addr=16; addr<832; addr++)
-    {
+    {   
         parity[0] = -1;
         parity[1] = -1;
         parity[2] = -1;
@@ -70,6 +71,7 @@ int HammingDecode(uint16_t *eeData)
         parity[4] = -1;
         
         data = eeData[addr];
+        
         mask = 1;
         for( int i = 0; i < 16; i++)
         {          
@@ -82,7 +84,8 @@ int HammingDecode(uint16_t *eeData)
         parity[2] = D[1]^D[2]^D[3]^D[7]^D[8]^D[9]^D[10]^D[13];
         parity[3] = D[4]^D[5]^D[6]^D[7]^D[8]^D[9]^D[10]^D[14];
         parity[4] = D[0]^D[1]^D[2]^D[3]^D[4]^D[5]^D[6]^D[7]^D[8]^D[9]^D[10]^D[11]^D[12]^D[13]^D[14]^D[15];
-       
+        
+        
         if ((parity[0]!=0) || (parity[1]!=0) || (parity[2]!=0) || (parity[3]!=0) || (parity[4]!=0))
         {        
             check = (parity[0]<<0) + (parity[1]<<1) + (parity[2]<<2) + (parity[3]<<3) + (parity[4]<<4);
@@ -176,7 +179,7 @@ int HammingDecode(uint16_t *eeData)
             {
                 error = -10;                
             }   
-         }
+        }
         
         eeData[addr] = data & 0x07FF;
     }
@@ -186,11 +189,83 @@ int HammingDecode(uint16_t *eeData)
 
 //------------------------------------------------------------------------------
 
+int MLX90641_SynchFrame(uint8_t slaveAddr)
+{
+    uint16_t dataReady = 0;
+    uint16_t statusRegister;
+    int error = 1;
+    
+    error = MLX90641_I2CWrite(slaveAddr, 0x8000, 0x0030);
+    if(error == -1)
+    {
+        return error;
+    }
+    
+    while(dataReady == 0)
+    {
+        error = MLX90641_I2CRead(slaveAddr, 0x8000, 1, &statusRegister);
+        if(error != 0)
+        {
+            return error;
+        }    
+        dataReady = statusRegister & 0x0008;
+    }      
+    
+   return 0;   
+}
+
+//------------------------------------------------------------------------------
+
+int MLX90641_TriggerMeasurement(uint8_t slaveAddr)
+{
+    int error = 1;
+    uint16_t ctrlReg;
+    
+    error = MLX90641_I2CRead(slaveAddr, 0x800D, 1, &ctrlReg);
+    
+    if ( error != 0) 
+    {
+        return error;
+    }    
+                                                
+    ctrlReg |= 0x8000;
+    error = MLX90641_I2CWrite(slaveAddr, 0x800D, ctrlReg);
+    
+    if ( error != 0)
+    {
+        return error;
+    }    
+    
+    error = MLX90641_I2CGeneralReset();
+    
+    if ( error != 0)
+    {
+        return error;
+    }    
+    
+    error = MLX90641_I2CRead(slaveAddr, 0x800D, 1, &ctrlReg);
+    
+    if ( error != 0)
+    {
+        return error;
+    }    
+    
+    if ((ctrlReg & 0x8000) != 0)
+    {
+        return -11;
+    }
+    
+    return 0;    
+}
+
+//------------------------------------------------------------------------------
+
 int MLX90641_GetFrameData(uint8_t slaveAddr, uint16_t *frameData)
 {
     uint16_t dataReady = 1;
     uint16_t controlRegister1;
     uint16_t statusRegister;
+    uint16_t data[48];
     int error = 1;
     uint8_t cnt = 0;
     uint8_t subPage = 0;
@@ -207,113 +282,153 @@ int MLX90641_GetFrameData(uint8_t slaveAddr, uint16_t *frameData)
     }   
     subPage = statusRegister & 0x0001;
         
-    while(dataReady != 0 && cnt < 5)
+    error = MLX90641_I2CWrite(slaveAddr, 0x8000, 0x0030);
+    if(error == -1)
+    {
+        return error;
+    }
+                
+    if(subPage == 0)
     { 
-        error = MLX90641_I2CWrite(slaveAddr, 0x8000, 0x0030);
-        if(error == -1)
+        error = MLX90641_I2CRead(slaveAddr, 0x0400, 32, frameData); 
+        if(error != 0)
         {
             return error;
         }
-            
-        if(subPage == 0)
-        { 
-            error = MLX90641_I2CRead(slaveAddr, 0x0400, 32, frameData); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x0440, 32, frameData+32); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x0480, 32, frameData+64); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x04C0, 32, frameData+96); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x0500, 32, frameData+128); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x0540, 32, frameData+160); 
-            if(error != 0)
-            {
-                return error;
-            }
-        }    
-        else
-        {
-             error = MLX90641_I2CRead(slaveAddr, 0x0420, 32, frameData); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x0460, 32, frameData+32); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x04A0, 32, frameData+64); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x04E0, 32, frameData+96); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x0520, 32, frameData+128); 
-            if(error != 0)
-            {
-                return error;
-            }
-            error = MLX90641_I2CRead(slaveAddr, 0x0560, 32, frameData+160); 
-            if(error != 0)
-            {
-                return error;
-            }
-        }   
-        
-        error = MLX90641_I2CRead(slaveAddr, 0x0580, 48, frameData+192); 
+        error = MLX90641_I2CRead(slaveAddr, 0x0440, 32, frameData+32); 
         if(error != 0)
         {
             return error;
-        }            
-                   
-        error = MLX90641_I2CRead(slaveAddr, 0x8000, 1, &statusRegister);
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x0480, 32, frameData+64); 
         if(error != 0)
         {
             return error;
-        }    
-        dataReady = statusRegister & 0x0008;
-        subPage = statusRegister & 0x0001;      
-        cnt = cnt + 1;
-    }
-    
-    if(cnt > 4)
-    {
-        return -8;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x04C0, 32, frameData+96); 
+        if(error != 0)
+        {
+            return error;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x0500, 32, frameData+128); 
+        if(error != 0)
+        {
+            return error;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x0540, 32, frameData+160); 
+        if(error != 0)
+        {
+            return error;
+        }
     }    
+    else
+    {
+        error = MLX90641_I2CRead(slaveAddr, 0x0420, 32, frameData); 
+        if(error != 0)
+        {
+            return error;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x0460, 32, frameData+32); 
+        if(error != 0)
+        {
+            return error;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x04A0, 32, frameData+64); 
+        if(error != 0)
+        {
+            return error;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x04E0, 32, frameData+96); 
+        if(error != 0)
+        {
+            return error;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x0520, 32, frameData+128); 
+        if(error != 0)
+        {
+            return error;
+        }
+        error = MLX90641_I2CRead(slaveAddr, 0x0560, 32, frameData+160); 
+        if(error != 0)
+        {
+            return error;
+        }
+    }   
+    
+    error = MLX90641_I2CRead(slaveAddr, 0x0580, 48, data); 
+    if(error != 0)
+    {
+        return error;
+    }            
+    
     
     error = MLX90641_I2CRead(slaveAddr, 0x800D, 1, &controlRegister1);
-    
     frameData[240] = controlRegister1;
-    frameData[241] = statusRegister & 0x0001;
-    
+    frameData[241] = subPage;
+
     if(error != 0)
     {
         return error;
     }
     
+    error = ValidateAuxData(data);
+    if(error == 0)
+    {
+        for(cnt=0; cnt<48; cnt++)
+        {
+            frameData[cnt+192] = data[cnt];
+        }
+    }        
+    
+    error = ValidateFrameData(frameData);
+    if (error != 0)
+    {
+        return error;
+    }                                 
+    
     return frameData[241];    
+}
+
+int ValidateFrameData(uint16_t *frameData)
+{
+    uint8_t line = 0;
+    
+    for(int i=0; i<192; i+=16)
+    {
+        if(frameData[i] == 0x7FFF) return -8;
+        line = line + 1;
+    }    
+        
+    return 0;    
+}
+
+int ValidateAuxData(uint16_t *auxData) 
+{
+    
+    if(auxData[0] == 0x7FFF) return -8;    
+    
+    for(int i=8; i<19; i++)
+    {
+        if(auxData[i] == 0x7FFF) return -8;
+    }
+    
+    for(int i=20; i<23; i++)
+    {
+        if(auxData[i] == 0x7FFF) return -8;
+    }
+    
+    for(int i=24; i<33; i++)
+    {
+        if(auxData[i] == 0x7FFF) return -8;
+    }
+    
+    for(int i=40; i<48; i++)
+    {
+        if(auxData[i] == 0x7FFF) return -8;
+    }
+    
+    return 0;
+    
 }
 
 //------------------------------------------------------------------------------
@@ -332,11 +447,11 @@ int MLX90641_ExtractParameters(uint16_t *eeData, paramsMLX90641 *mlx90641)
         ExtractResolutionParameters(eeData, mlx90641);
         ExtractKsTaParameters(eeData, mlx90641);
         ExtractKsToParameters(eeData, mlx90641);
+        ExtractCPParameters(eeData, mlx90641);
         ExtractAlphaParameters(eeData, mlx90641);
         ExtractOffsetParameters(eeData, mlx90641);
         ExtractKtaPixelParameters(eeData, mlx90641);
-        ExtractKvPixelParameters(eeData, mlx90641);
-        ExtractCPParameters(eeData, mlx90641);
+        ExtractKvPixelParameters(eeData, mlx90641);        
         error = ExtractDeviatingPixels(eeData, mlx90641);  
     }
     
@@ -1179,7 +1294,7 @@ int ExtractDeviatingPixels(uint16_t *eeData, paramsMLX90641 *mlx90641)
     }
         
     pixCnt = 0;    
-    while (pixCnt < 192 && brokenPixCnt < 3)
+    while (pixCnt < 192 && brokenPixCnt < 2)
     {
         if((eeData[pixCnt+64] == 0) && (eeData[pixCnt+256] == 0) && (eeData[pixCnt+448] == 0) && (eeData[pixCnt+640] == 0))
         {
