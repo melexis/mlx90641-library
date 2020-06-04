@@ -14,8 +14,8 @@
  * limitations under the License.
  *
  */
-#ifndef _MLX641_API_H_
-#define _MLX641_API_H_
+#ifndef _MLX90641_API_H_
+#define _MLX90641_API_H_
 
 #define SCALEALPHA 0.000001
     
@@ -50,6 +50,8 @@
     } paramsMLX90641;
     
     int MLX90641_DumpEE(uint8_t slaveAddr, uint16_t *eeData);
+    int MLX90641_SynchFrame(uint8_t slaveAddr);
+    int MLX90641_TriggerMeasurement(uint8_t slaveAddr);
     int MLX90641_GetFrameData(uint8_t slaveAddr, uint16_t *frameData);
     int MLX90641_ExtractParameters(uint16_t *eeData, paramsMLX90641 *mlx90641);
     float MLX90641_GetVdd(uint16_t *frameData, const paramsMLX90641 *params);
