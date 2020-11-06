@@ -46,7 +46,7 @@
         float cpAlpha;
         int16_t cpOffset;
         float emissivityEE; 
-        uint16_t brokenPixels[2];
+        uint16_t brokenPixels[3];
     } paramsMLX90641;
     
     int MLX90641_DumpEE(uint8_t slaveAddr, uint16_t *eeData);
