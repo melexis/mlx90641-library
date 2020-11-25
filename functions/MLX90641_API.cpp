@@ -681,11 +681,17 @@ void MLX90641_GetImage(uint16_t *frameData, const paramsMLX90641 *params, float 
     float alphaCompensated;
     float image;
     uint16_t subPage;
+    float ktaScale;
+    float kvScale;
+    float kta;
+    float kv;
     
     subPage = frameData[241];
     
     vdd = MLX90641_GetVdd(frameData, params);
     ta = MLX90641_GetTa(frameData, params);
+    ktaScale = pow(2,(double)params->ktaScale);
+    kvScale = pow(2,(double)params->kvScale);
     
 //------------------------- Gain calculation -----------------------------------    
     gain = frameData[202];
@@ -715,7 +721,10 @@ void MLX90641_GetImage(uint16_t *frameData, const paramsMLX90641 *params, float 
         }
         irData = irData * gain;
         
-        irData = irData - params->offset[subPage][pixelNumber]*(1 + params->kta[pixelNumber]*(ta - 25))*(1 + params->kv[pixelNumber]*(vdd - 3.3));
+        kta = (float)params->kta[pixelNumber]/ktaScale;
+        kv = (float)params->kv[pixelNumber]/kvScale;
+            
+        irData = irData - params->offset[subPage][pixelNumber]*(1 + kta*(ta - 25))*(1 + kv*(vdd - 3.3));                
         
         irData = irData - params->tgc * irDataCP;
             
@@ -787,52 +796,47 @@ int MLX90641_GetSubPageNumber(uint16_t *frameData)
 }    
 
 //------------------------------------------------------------------------------
-void MLX90641_BadPixelsCorrection(uint16_t *pixels, float *to, paramsMLX90641 *params)
+void MLX90641_BadPixelsCorrection(uint16_t pixel, float *to)
 {   
     float ap[2];
-    uint8_t pix;
     uint8_t line;
     uint8_t column;
     
-    pix = 0;
-    while(pixels[pix]< 65535)
+    if(pixel<192)
     {
-        line = pixels[pix]>>5;
-        column = pixels[pix] - (line<<5);
+        line = pixel>>4;
+        column = pixel - (line<<4);
                
         if(column == 0)
         {
-            to[pixels[pix]] = to[pixels[pix]+1];            
+            to[pixel] = to[pixel+1];            
         }
         else if(column == 1 || column == 14)
         {
-            to[pixels[pix]] = (to[pixels[pix]-1]+to[pixels[pix]+1])/2.0;                
+            to[pixel] = (to[pixel-1]+to[pixel+1])/2.0;                
         } 
         else if(column == 15)
         {
-            to[pixels[pix]] = to[pixels[pix]-1];
+            to[pixel] = to[pixel-1];
         } 
         else
         {            
-            ap[0] = to[pixels[pix]+1] - to[pixels[pix]+2];
-            ap[1] = to[pixels[pix]-1] - to[pixels[pix]-2];
+            ap[0] = to[pixel+1] - to[pixel+2];
+            ap[1] = to[pixel-1] - to[pixel-2];
             if(fabs(ap[0]) > fabs(ap[1]))
             {
-                to[pixels[pix]] = to[pixels[pix]-1] + ap[1];                        
+                to[pixel] = to[pixel-1] + ap[1];                        
             }
             else
             {
-                to[pixels[pix]] = to[pixels[pix]+1] + ap[0];                        
+                to[pixel] = to[pixel+1] + ap[0];                        
             }
                     
         }                      
-     
-        pix = pix + 1;    
-    }    
-}
+    }   
+}    
 
 //------------------------------------------------------------------------------
-
 void ExtractVDDParameters(uint16_t *eeData, paramsMLX90641 *mlx90641)
 {
     int16_t kVdd;
@@ -1288,22 +1292,18 @@ int ExtractDeviatingPixels(uint16_t *eeData, paramsMLX90641 *mlx90641)
 
     int warn = 0;
     
-    for(pixCnt = 0; pixCnt<3; pixCnt++)
-    {
-        mlx90641->brokenPixels[pixCnt] = 0xFFFF;
-    }
+    mlx90641->brokenPixel = 0xFFFF;
         
     pixCnt = 0;    
     while (pixCnt < 192 && brokenPixCnt < 2)
     {
         if((eeData[pixCnt+64] == 0) && (eeData[pixCnt+256] == 0) && (eeData[pixCnt+448] == 0) && (eeData[pixCnt+640] == 0))
         {
-            mlx90641->brokenPixels[brokenPixCnt] = pixCnt;
+            mlx90641->brokenPixel = pixCnt;
             brokenPixCnt = brokenPixCnt + 1;
         }    
         
         pixCnt = pixCnt + 1;
-        
     } 
     
     if(brokenPixCnt > 1)  
