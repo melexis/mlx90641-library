@@ -46,7 +46,7 @@
         float cpAlpha;
         int16_t cpOffset;
         float emissivityEE; 
-        uint16_t brokenPixels[2];
+        uint16_t brokenPixel;
     } paramsMLX90641;
     
     int MLX90641_DumpEE(uint8_t slaveAddr, uint16_t *eeData);
@@ -64,6 +64,6 @@
     int MLX90641_GetRefreshRate(uint8_t slaveAddr);  
     int MLX90641_GetSubPageNumber(uint16_t *frameData);
     float MLX90641_GetEmissivity(const paramsMLX90641 *mlx90641);
-    void MLX90641_BadPixelsCorrection(uint16_t *pixels, float *to, paramsMLX90641 *params);
+    void MLX90641_BadPixelsCorrection(uint16_t pixel, float *to);
     
 #endif
