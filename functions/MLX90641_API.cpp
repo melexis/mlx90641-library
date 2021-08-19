@@ -1256,7 +1256,7 @@ void ExtractCPParameters(uint16_t *eeData, paramsMLX90641 *mlx90641)
     alphaCP = alphaCP /  pow(2,(double)alphaScale);
     
     
-    cpKta = eeData[49] & 0x001F;
+    cpKta = eeData[49] & 0x003F;
     if (cpKta > 31)
     {
         cpKta = cpKta - 64;
@@ -1264,7 +1264,7 @@ void ExtractCPParameters(uint16_t *eeData, paramsMLX90641 *mlx90641)
     ktaScale1 = eeData[49] >> 6;    
     mlx90641->cpKta = cpKta / pow(2,(double)ktaScale1);
     
-    cpKv = eeData[50] & 0x001F;
+    cpKv = eeData[50] & 0x003F;
     if (cpKv > 31)
     {
         cpKv = cpKv - 64;
